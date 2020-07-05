@@ -14,14 +14,17 @@
 # limitations under the License.
 
 from ryu.base import app_manager
+from ryu.app import simple_switch_13
 from ryu.controller import ofp_event
-from ryu.controller.handler import CONFIG_DISPATCHER, MAIN_DISPATCHER
+from ryu.controller.handler import CONFIG_DISPATCHER, MAIN_DISPATCHER,DEAD_DISPATCHER
 from ryu.controller.handler import set_ev_cls
 from ryu.ofproto import ofproto_v1_3
 from ryu.lib.packet import packet
 from ryu.lib.packet import ethernet
 from ryu.lib.packet import ether_types
 from ryu.lib.packet import ipv4
+from ryu.lib import hub
+import json
 
 
 class SimpleSwitch13(app_manager.RyuApp):
@@ -30,7 +33,80 @@ class SimpleSwitch13(app_manager.RyuApp):
     def __init__(self, *args, **kwargs):
         super(SimpleSwitch13, self).__init__(*args, **kwargs)
         self.mac_to_port = {}
+        self.datapaths = {}
+        self.monitor_thread = hub.spawn(self._monitor)
 
+    @set_ev_cls(ofp_event.EventOFPStateChange,
+                [MAIN_DISPATCHER, DEAD_DISPATCHER])
+    def _state_change_handler(self, ev):
+        datapath = ev.datapath
+        if ev.state == MAIN_DISPATCHER:
+            if datapath.id not in self.datapaths:
+                self.logger.debug('register datapath: %016x', datapath.id)
+                self.datapaths[datapath.id] = datapath
+        elif ev.state == DEAD_DISPATCHER:
+            if datapath.id in self.datapaths:
+                self.logger.debug('unregister datapath: %016x', datapath.id)
+                del self.datapaths[datapath.id]
+
+    # Periodicly request switch status
+    def _monitor(self):
+        while True:
+            for dp in self.datapaths.values():
+                self._request_stats(dp)
+            hub.sleep(10)
+
+    # status request function for given dpid
+    def _request_stats(self,datapath):
+        self.logger.debug('send stats request: %016x', datapath.id)
+        ofproto = datapath.ofproto
+        parser = datapath.ofproto_parser
+        # get flow status
+        req = parser.OFPFlowStatsRequest(datapath)
+        datapath.send_msg(req)
+        # get port status
+        # req = parser.OFPPortStatsRequest(datapath, 0, ofproto.OFPP_ANY)
+        # datapath.send_msg(req)
+
+    # Stats reply function,body is useful for us
+    @set_ev_cls(ofp_event.EventOFPFlowStatsReply, MAIN_DISPATCHER)
+    def _flow_stats_reply_handler(self, ev):
+        body = ev.msg.body
+        # output selected attribute
+        self.logger.info('datapath         '
+                         'in-port  eth-dst           '
+                         'out-port packets  bytes')
+        self.logger.info('---------------- '
+                         '-------- ----------------- '
+                         '-------- -------- --------')
+        for stat in sorted([flow for flow in body if flow.priority == 1],
+                           key=lambda flow: (flow.match['in_port'],
+                                             flow.match['eth_dst'])):
+            self.logger.info('%016x %8x %17s %8x %8d %8d',
+                             ev.msg.datapath.id,
+                             stat.match['in_port'], stat.match['eth_dst'],
+                             stat.instructions[0].actions[0].port,
+                             stat.packet_count, stat.byte_count)
+        #output msg by json
+        self.logger.info(json.dumps(ev.msg.to_jsondict(),indent=3)) 
+
+    # port status statistic,not used
+    # @set_ev_cls(ofp_event.EventOFPPortStatsReply, MAIN_DISPATCHER)
+    # def _port_stats_reply_handler(self, ev):
+    #     body = ev.msg.body
+
+    #     self.logger.info('datapath         port     '
+    #                      'rx-pkts  rx-bytes rx-error '
+    #                      'tx-pkts  tx-bytes tx-error')
+    #     self.logger.info('---------------- -------- '
+    #                      '-------- -------- -------- '
+    #                      '-------- -------- --------')
+    #     for stat in sorted(body, key=attrgetter('port_no')):
+    #         self.logger.info('%016x %8x %8d %8d %8d %8d %8d %8d',
+    #                          ev.msg.datapath.id, stat.port_no,
+    #                          stat.rx_packets, stat.rx_bytes, stat.rx_errors,
+    #                          stat.tx_packets, stat.tx_bytes, stat.tx_errors)
+        
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
     def switch_features_handler(self, ev):
         datapath = ev.msg.datapath
@@ -155,21 +231,24 @@ class SimpleSwitch13(app_manager.RyuApp):
                                          match)
         datapath.send_msg(req)
 
-    @set_ev_cls(ofp_event.EventOFPFlowStatsReply, MAIN_DISPATCHER) # this is what we want!!!
-    def flow_stats_reply_handler(self, ev):
-        print('get flow stats reply!!!')
-        flows = []
-        for stat in ev.msg.body:
-            flows.append('table_id=%s '
-                   'duration_sec=%d duration_nsec=%d '
-                   'priority=%d '
-                   'idle_timeout=%d hard_timeout=%d flags=0x%04x '
-                   'cookie=%d packet_count=%d byte_count=%d '
-                   'match=%s instructions=%s' %
-                   (stat.table_id,
-                   stat.duration_sec, stat.duration_nsec,
-                   stat.priority,
-                   stat.idle_timeout, stat.hard_timeout, stat.flags,
-                   stat.cookie, stat.packet_count, stat.byte_count,
-                   stat.match, stat.instructions))
-        self.logger.debug('FlowStats: %s', flows)
+    # @set_ev_cls(ofp_event.EventOFPFlowStatsReply, MAIN_DISPATCHER) # this is what we want!!!
+    # def flow_stats_reply_handler(self, ev):
+    #     print('get flow stats reply!!!')
+    #     flows = []
+    #     for stat in ev.msg.body:
+    #         flows.append('table_id=%s '
+    #                'duration_sec=%d duration_nsec=%d '
+    #                'priority=%d '
+    #                'idle_timeout=%d hard_timeout=%d flags=0x%04x '
+    #                'cookie=%d packet_count=%d byte_count=%d '
+    #                'match=%s instructions=%s' %
+    #                (stat.table_id,
+    #                stat.duration_sec, stat.duration_nsec,
+    #                stat.priority,
+    #                stat.idle_timeout, stat.hard_timeout, stat.flags,
+    #                stat.cookie, stat.packet_count, stat.byte_count,
+    #                stat.match, stat.instructions))
+    #     for statMsg in flows:
+    #         self.logger.info("FlowStats: %s",statMsg)
+    #         self.logger.info(len(flows))
+    #     self.logger.debug('FlowStats: %s', flows)
