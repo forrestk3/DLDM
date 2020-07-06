@@ -49,6 +49,7 @@ class SimpleSwitch13(app_manager.RyuApp):
         self.logger.debug('send stats request: %016x', datapath.id)
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
+        # get flowStats request
         req = parser.OFPFlowStatsRequest(datapath)
         datapath.send_msg(req)
         # get port status
@@ -76,17 +77,17 @@ class SimpleSwitch13(app_manager.RyuApp):
 
         # format msg by json and put it into queue
         flow_stats = {} # use dict to save flow stats message
-        flow_stats['%016x'%(ev.msg.datapath.id)] = ev.msg.to_jsondict() 
-        self.flow_stats_queue.put(flow_stats)
+        flow_stats['%016x'%(ev.msg.datapath.id)] = ev.msg.to_jsondict() # key is dpid
+        self.flow_stats_queue.put(flow_stats) # put orgenized stats into queue
 
     #使用stats_msg=list存储队列中的flow_stats信息
     def flow_stats_processing(self):
         while True:
             stats_msg = []
-            hub.sleep(10)
+            hub.sleep(10) #put queue's msg into list,every 10 seconds
             while (not self.flow_stats_queue.empty()):
                 stats_msg.append(self.flow_stats_queue.get())
-            self.logger.info(json.dumps(stats_msg))
+            self.logger.info(json.dumps(stats_msg)) # print list in json format
 
         
     # port status statistic,not used
