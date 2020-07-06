@@ -1,18 +1,3 @@
-# Copyright (C) 2011 Nippon Telegraph and Telephone Corporation.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#    http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
-# implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 from ryu.base import app_manager
 from ryu.app import simple_switch_13
 from ryu.controller import ofp_event
@@ -25,7 +10,7 @@ from ryu.lib.packet import ether_types
 from ryu.lib.packet import ipv4
 from ryu.lib import hub
 import json
-
+import queue
 
 class SimpleSwitch13(app_manager.RyuApp):
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
@@ -34,6 +19,9 @@ class SimpleSwitch13(app_manager.RyuApp):
         super(SimpleSwitch13, self).__init__(*args, **kwargs)
         self.mac_to_port = {}
         self.datapaths = {}
+        self.flow_stats_processing_thread = hub.spawn(self.flow_stats_processing)
+
+        self.flow_stats_queue = queue.Queue()
         self.monitor_thread = hub.spawn(self._monitor)
 
     @set_ev_cls(ofp_event.EventOFPStateChange,
@@ -61,12 +49,10 @@ class SimpleSwitch13(app_manager.RyuApp):
         self.logger.debug('send stats request: %016x', datapath.id)
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
-        # get flow status
         req = parser.OFPFlowStatsRequest(datapath)
         datapath.send_msg(req)
         # get port status
         # req = parser.OFPPortStatsRequest(datapath, 0, ofproto.OFPP_ANY)
-        # datapath.send_msg(req)
 
     # Stats reply function,body is useful for us
     @set_ev_cls(ofp_event.EventOFPFlowStatsReply, MAIN_DISPATCHER)
@@ -87,9 +73,22 @@ class SimpleSwitch13(app_manager.RyuApp):
                              stat.match['in_port'], stat.match['eth_dst'],
                              stat.instructions[0].actions[0].port,
                              stat.packet_count, stat.byte_count)
-        #output msg by json
-        self.logger.info(json.dumps(ev.msg.to_jsondict(),indent=3)) 
 
+        # format msg by json and put it into queue
+        flow_stats = {} # use dict to save flow stats message
+        flow_stats['%016x'%(ev.msg.datapath.id)] = ev.msg.to_jsondict() 
+        self.flow_stats_queue.put(flow_stats)
+
+    #使用stats_msg=list存储队列中的flow_stats信息
+    def flow_stats_processing(self):
+        while True:
+            stats_msg = []
+            hub.sleep(10)
+            while (not self.flow_stats_queue.empty()):
+                stats_msg.append(self.flow_stats_queue.get())
+            self.logger.info(json.dumps(stats_msg))
+
+        
     # port status statistic,not used
     # @set_ev_cls(ofp_event.EventOFPPortStatsReply, MAIN_DISPATCHER)
     # def _port_stats_reply_handler(self, ev):
