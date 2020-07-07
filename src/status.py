@@ -49,7 +49,7 @@ class SimpleSwitch13(app_manager.RyuApp):
         self.logger.debug('send stats request: %016x', datapath.id)
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
-        # get flowStats request
+        # send flowStats request to switch
         req = parser.OFPFlowStatsRequest(datapath)
         datapath.send_msg(req)
         # get port status

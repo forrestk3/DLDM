@@ -1,32 +1,117 @@
 # coding=utf-8
-import threading, time, queue
-q = queue.Queue()
-def Produce(name):
-    count = 0   #   conut表示做的包子总个数
-    while count < 10:
-        print('厨师%s在做包子中...'%name)
-        time.sleep(1)
-        q.put(count)   # 容器中添加包子
-  # 当做完一个包子后就要给顾客发送一个信号,表示已经做完,让他们吃包子
-        print('produce%s已经做好了第%s个包子'%(name, count))
-        count += 1
-        print('oking...')
-def Consumer(name):
-    count = 0    #  count表示包子被吃的总个数
-    while count < 10:
-        time.sleep(2)  #  排队去取包子,
-        if not q.empty():   # 如果存在
-            data = q.get() #  取包子, 吃包子
-            print('\033[32;1mConsumer %s已经把第%s个包子吃了...\033[0m' %(name, data))
-        else:
-            print('包子被吃完了...')
-        count += 1
-if __name__ == '__main__':
-    p1 = threading.Thread(target=Produce, args=('A君',))
-    c1 = threading.Thread(target=Consumer, args=('B君',))
-    c2 = threading.Thread(target=Consumer, args=('C君',))
-    c3 = threading.Thread(target=Consumer, args=('D君',))
-    p1.start()
-    c1.start()
-    c2.start()
-    c3.start()
+from ryu.base import app_manager
+from ryu.controller import ofp_event
+from ryu.controller.handler import CONFIG_DISPATCHER, MAIN_DISPATCHER
+from ryu.controller.handler import set_ev_cls
+
+from ryu.ofproto import ofproto_v1_3
+
+from ryu.lib.packet import packet
+from ryu.lib.packet import ethernet
+from ryu.lib.packet import arp
+from ryu.lib.packet import ipv4
+from ryu.lib.packet import icmp
+
+class IcmpResponder(app_manager.RyuApp):
+    OFP_VERSIONS=[ofproto_v1_3.OFP_VERSION]
+    def __init__(self,*args, **kwargs):
+        super(IcmpResponder,self).__init__(*args, **kwargs)
+        self.hw_addr='0a:e4:1c:d1:3e:44'
+        self.ip_addr = '10.0.0.2'
+
+    # 初始化时下发 tablemiss流表，并设定no-buffer
+    @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
+    def _switch_features_handler(self, ev):
+        msg = ev.msg
+        datapath = msg.datapath
+        ofproto = datapath.ofproto
+        parser = datapath.ofproto_parser
+        actions = [parser.OFPActionOutput(port=ofproto.OFPP_CONTROLLER,
+                                          max_len=ofproto.OFPCML_NO_BUFFER)]
+        inst = [parser.OFPInstructionActions(type_=ofproto.OFPIT_APPLY_ACTIONS,
+                                             actions=actions)]
+        mod = parser.OFPFlowMod(datapath=datapath,
+                                priority=0,
+                                match=parser.OFPMatch(),
+                                instructions=inst)
+        datapath.send_msg(mod)
+
+    #对packet_in包分析，若不是以太网包则退出函数；
+    #若是arp包，交给arp包处理函数g处理
+    #若是icmp包，交给icmp包处理函数处理
+    @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
+    def _packet_in_handler(self, ev):
+        msg = ev.msg
+        datapath = msg.datapath
+        port = msg.match['in_port']
+        pkt = packet.Packet(data=msg.data)
+        self.logger.info('packet_in *********************')
+        self.logger.info("packet-in %s" % (pkt,))
+        self.logger.info('packet_in *********************')
+        pkt_ethernet = pkt.get_protocol(ethernet.ethernet)
+        if not pkt_ethernet:
+            self.logger.info('!!!not ethernet packet!!!')
+            return
+        pkt_arp = pkt.get_protocol(arp.arp)
+        if pkt_arp:
+#            self._handle_arp(datapath, port, pkt_ethernet, pkt_arp)
+            return
+        pkt_ipv4 = pkt.get_protocol(ipv4.ipv4)
+        if pkt_ipv4:
+            self.logger.info('ipv4 ^^^^^^^^^^^^^^^^^^^^^^^')
+            self.logger.info('ipv4 %s,src=%s' % (pkt_ipv4,pkt_ipv4.src))
+            self.logger.info('ipv4 ^^^^^^^^^^^^^^^^^^^^^^^')
+        pkt_icmp = pkt.get_protocol(icmp.icmp)
+        if pkt_icmp:
+            self._handle_icmp(datapath, port, pkt_ethernet, pkt_ipv4, pkt_icmp)
+            return
+
+    #arp包处理函数处理
+    def _handle_arp(self, datapath, port, pkt_ethernet, pkt_arp):
+        if pkt_arp.opcode != arp.ARP_REQUEST:
+            return
+        pkt = packet.Packet()
+        pkt.add_protocol(ethernet.ethernet(ethertype=pkt_ethernet.ethertype,
+                                           dst=pkt_ethernet.src,
+                                           src=self.hw_addr))
+        pkt.add_protocol(arp.arp(opcode=arp.ARP_REPLY,
+                                 src_mac=self.hw_addr,
+                                 src_ip=self.ip_addr,
+                                 dst_mac=pkt_arp.src_mac,
+                                 dst_ip=pkt_arp.src_ip))
+        self.logger.info('find ARP!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+        self._send_packet(datapath, port, pkt)
+
+    #ICMP包处理函数
+    def _handle_icmp(self, datapath, port, pkt_ethernet, pkt_ipv4, pkt_icmp):
+        self.logger.info('find icmp!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+        if pkt_icmp.type != icmp.ICMP_ECHO_REQUEST:
+            return
+        pkt = packet.Packet()
+        pkt.add_protocol(ethernet.ethernet(ethertype=pkt_ethernet.ethertype,
+                                           dst=pkt_ethernet.src,
+                                           src=self.hw_addr))
+        pkt.add_protocol(ipv4.ipv4(dst=pkt_ipv4.src,
+                                   src=self.ip_addr,
+                                   proto=pkt_ipv4.proto))
+        pkt.add_protocol(icmp.icmp(type_=icmp.ICMP_ECHO_REPLY,
+                                   code=icmp.ICMP_ECHO_REPLY_CODE,
+                                   csum=0,
+                                   data=pkt_icmp.data))
+        self._send_packet(datapath, port, pkt)
+         
+    def _send_packet(self, datapath, port, pkt):
+        ofproto = datapath.ofproto
+        parser = datapath.ofproto_parser
+        pkt.serialize()
+        self.logger.info('send packet ********************')
+        self.logger.info("packet-out %s" % (pkt,))
+        self.logger.info('send packet ********************')
+        data = pkt.data
+        actions = [parser.OFPActionOutput(port=port)]
+        out = parser.OFPPacketOut(datapath=datapath,
+                                  buffer_id=ofproto.OFP_NO_BUFFER,
+                                  in_port=ofproto.OFPP_CONTROLLER,
+                                  actions=actions,
+                                  data=data)
+        datapath.send_msg(out)
