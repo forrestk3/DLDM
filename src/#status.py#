@@ -148,6 +148,7 @@ class SimpleSwitch13(app_manager.RyuApp):
             self.logger.debug("packet truncated: only %s of %s bytes",
                               ev.msg.msg_len, ev.msg.total_len)
         msg = ev.msg
+        self.logger.info(msg)
         datapath = msg.datapath
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
@@ -156,7 +157,7 @@ class SimpleSwitch13(app_manager.RyuApp):
         pkt = packet.Packet(msg.data)
         eth = pkt.get_protocols(ethernet.ethernet)[0]
 
-        pkt_ipv4 = pkt.get_protocols(ipv4.ipv4)
+        pkt_ipv4 = pkt.get_protocol(ipv4.ipv4)
         if pkt_ipv4:
             self.logger.info('ipv4 ^^^^^^^^^^^^^^^^^^^^^^^')
             self.logger.info('ipv4 %s,src=%s' % (pkt_ipv4,pkt_ipv4[0].src))
