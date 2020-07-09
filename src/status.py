@@ -156,12 +156,6 @@ class SimpleSwitch13(app_manager.RyuApp):
         pkt = packet.Packet(msg.data)
         eth = pkt.get_protocols(ethernet.ethernet)[0]
 
-        pkt_ipv4 = pkt.get_protocols(ipv4.ipv4)
-        if pkt_ipv4:
-            self.logger.info('ipv4 ^^^^^^^^^^^^^^^^^^^^^^^')
-            self.logger.info('ipv4 %s,src=%s' % (pkt_ipv4,pkt_ipv4[0].src))
-            self.logger.info('ipv4 ^^^^^^^^^^^^^^^^^^^^^^^')
-
         if eth.ethertype == ether_types.ETH_TYPE_LLDP:
             # ignore lldp packet
             return
