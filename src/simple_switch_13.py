@@ -7,7 +7,8 @@ from ryu.lib.packet import packet
 from ryu.lib.packet import ethernet
 from ryu.lib.packet import ether_types
 from ryu.lib.packet import ipv4
-
+from ryu.lib.packet import arp
+from ryu.lib import dpid as dpid_lib
 
 class SimpleSwitch13(app_manager.RyuApp):
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
@@ -63,30 +64,62 @@ class SimpleSwitch13(app_manager.RyuApp):
         parser = datapath.ofproto_parser
         in_port = msg.match['in_port']
 
+        dpid_str = dpid_lib.dpid_to_str(datapath.id)
+        # print(type(dpid_str))
+        # print(dpid_str)
+        
         pkt = packet.Packet(msg.data)
-        self.logger.info("packet_in is :%s",pkt)
+        # self.logger.info("packet_in is :%s",pkt)
         eth = pkt.get_protocols(ethernet.ethernet)[0]
-        #获得它的IP的源和目的地址 
+        if not eth:
+            return
+
+       #获得它的IP的源和目的地址,要先看高层协议
         pkt_ipv4 = pkt.get_protocol(ipv4.ipv4)
         if pkt_ipv4:
             ipv4_src = pkt_ipv4.src
             ipv4_dst = pkt_ipv4.dst
             self.logger.info('ipv4 ^^^^^^^^^^^^^^^^^^^^^^^')
-            self.logger.info('dst=%s,src=%s' % (pkt_ipv4.dst,pkt_ipv4.src))
+            self.logger.info('dst=%s,src=%s,eth_src=%s,eth_dst=%s' % (pkt_ipv4.dst,pkt_ipv4.src,
+                pkt.get_protocols(ethernet.ethernet)[0].src,
+                pkt.get_protocols(ethernet.ethernet)[0].dst))
             self.logger.info('ipv4 ^^^^^^^^^^^^^^^^^^^^^^^')
-            self._packet_in_ip_handler(pkt_ipv4,datapath,msg)
+            self._packet_in_ip_handler(datapath,msg)
+            return
 
+        pkt_arp = pkt.get_protocol(arp.arp)
+        if pkt_arp:
+            self._packet_in_arp_handler(datapath,msg)
 
+ 
 
+    def _packet_in_ip_handler(self,datapath,msg):
+        # self.logger.info("IP:src ip:%s,dst ip:%s",pkt_ipv4.src_ip,pkt_ipv4.dst_ip)
+        ofproto = datapath.ofproto
+        parser = datapath.ofproto_parser
+        pkt = packet.Packet(msg.data)
 
-    def _packet_in_ip_handler(self,pkt_ipv4,datapath,msg):
-        dst = pkt_ipv4.dst
-        src = pkt_ipv4.src
+    def _packet_in_arp_handler(self,datapath,msg):
+        pkt_arp = packet.Packet(msg.data).get_protocol(arp.arp)
+        pkt_eth = packet.Packet(msg.data).get_protocols(ethernet.ethernet)[0]
+        # self.logger.info("dpid:%s,ARP:src ip:%s,dst ip:%s,opcode:%s",datapath.id,
+        #                                                             pkt_arp.src_ip,
+        #                                                             pkt_arp.dst_ip,
+        #                                                             pkt_arp.opcode)
+        self.logger.info("pkt_eth:%s",pkt_eth)
+        self.logger.info("")
+        ofproto = datapath.ofproto
+        parser = datapath.ofproto_parser
+        pkt = packet.Packet(msg.data)
+        pkt_eth = pkt.get_protocols(ethernet.ethernet)[0]
+        in_port = msg.match['in_port']
+        dst = pkt_eth.dst
+        src = pkt_eth.src
 
         dpid = format(datapath.id, "d").zfill(16)
         self.mac_to_port.setdefault(dpid, {})
 
-        self.logger.info("packet in %s %s %s %s", dpid, src, dst, in_port)
+        #self.logger.info("packet in %s %s %s %s", dpid, src, dst, in_port)
 
         # learn a mac address to avoid FLOOD next time.
         self.mac_to_port[dpid][src] = in_port
@@ -100,7 +133,7 @@ class SimpleSwitch13(app_manager.RyuApp):
 
         # install a flow to avoid packet_in next time
         if out_port != ofproto.OFPP_FLOOD:
-            match = parser.OFPMatch(in_port=in_port, eth_dst=dst, eth_src=src)
+            match = parser.OFPMatch(eth_dst=pkt_arp.dst_mac,eth_type = pkt_eth.ethertype)
             # verify if we have a valid buffer_id, if yes avoid to send both
             # flow_mod & packet_out
             if msg.buffer_id != ofproto.OFP_NO_BUFFER:
@@ -108,6 +141,8 @@ class SimpleSwitch13(app_manager.RyuApp):
                 return
             else:
                 self.add_flow(datapath, 1, match, actions)
+                self.logger.info("add flow:pkt_arp.src_mac:%s",pkt_arp.src_mac)
+                self.logger.info(match)
         data = None
         if msg.buffer_id == ofproto.OFP_NO_BUFFER:
             data = msg.data
@@ -115,3 +150,5 @@ class SimpleSwitch13(app_manager.RyuApp):
         out = parser.OFPPacketOut(datapath=datapath, buffer_id=msg.buffer_id,
                                   in_port=in_port, actions=actions, data=data)
         datapath.send_msg(out)
+
+
