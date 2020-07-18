@@ -77,7 +77,7 @@ class SimpleSwitch13(app_manager.RyuApp):
                                           ofproto.OFPCML_NO_BUFFER)]
         self.add_flow(datapath, 0, match, actions)
 
-    def add_flow(self, datapath, priority, match, actions, buffer_id=None):
+    def add_flow(self, datapath, priority, match, actions, buffer_id=None, idle_timeout=0):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
 
@@ -86,10 +86,11 @@ class SimpleSwitch13(app_manager.RyuApp):
         if buffer_id:
             mod = parser.OFPFlowMod(datapath=datapath, buffer_id=buffer_id,
                                     priority=priority, match=match,
-                                    instructions=inst)
+                                    instructions=inst, idle_timeout=idle_timeout)
         else:
             mod = parser.OFPFlowMod(datapath=datapath, priority=priority,
-                                    match=match, instructions=inst)
+                                    match=match, instructions=inst,
+                                    idle_timeout=idle_timeout)
         datapath.send_msg(mod)
 
     @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
@@ -148,7 +149,6 @@ class SimpleSwitch13(app_manager.RyuApp):
         links = [(dpid_lib.dpid_to_str(link.src.dpid),dpid_lib.dpid_to_str(link.dst.dpid),{'attr_dict':{'port':link.src.port_no}}) for link in link_list]    #add edge, need src,dst,weigtht
         self.network.add_edges_from(links)
 
-
     def get_out_port(self,datapath,src,dst,in_port):
         '''
         datapath: is current datapath info
@@ -182,7 +182,6 @@ class SimpleSwitch13(app_manager.RyuApp):
             self.logger.info("dst %s not in network,out_port=flood",dst)
             out_port = datapath.ofproto.OFPP_FLOOD    #By flood, to find dst, when dst get packet, dst will send a new back,the graph will record dst info
         return out_port
-
 
     def _packet_in_ip_handler(self,msg):
         datapath = msg.datapath
@@ -248,7 +247,6 @@ class SimpleSwitch13(app_manager.RyuApp):
                                   in_port=in_port, actions=actions, data=data)
         datapath.send_msg(out)
 
-
     def _packet_tcp_handler(self,msg):
         datapath = msg.datapath
         pkt = packet.Packet(msg.data)
@@ -277,9 +275,9 @@ class SimpleSwitch13(app_manager.RyuApp):
                 return
             else:
                 self.logger.info(out_port)
-                self.add_flow(datapath, 5, match, actions)
-                self.logger.info("tcp add flow,dpid:%s",datapath.id)
-                self.logger.info(match)         
+                self.add_flow(datapath, 5, match, actions, idle_timeout=15)
+                self.logger.info("tcp add flow,dpid:%s,timeout:15",datapath.id)
+                self.logger.info(match)
 
         data = None
         if msg.buffer_id == ofproto.OFP_NO_BUFFER:
