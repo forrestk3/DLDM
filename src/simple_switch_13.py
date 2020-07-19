@@ -1,6 +1,6 @@
 from ryu.base import app_manager
 from ryu.controller import ofp_event
-from ryu.controller.handler import CONFIG_DISPATCHER, MAIN_DISPATCHER
+from ryu.controller.handler import CONFIG_DISPATCHER, MAIN_DISPATCHER, DEAD_DISPATCHER
 from ryu.controller.handler import set_ev_cls
 from ryu.ofproto import ofproto_v1_3
 from ryu.lib.packet import packet
@@ -14,7 +14,12 @@ from ryu.lib.packet import arp
 from ryu.lib import dpid as dpid_lib
 from ryu.topology import event
 from ryu.topology.api import get_switch,get_link
+
+from ryu.lib import hub
 import networkx as nx
+import queue
+import json
+import stats_processing
 
 
 #                            _ooOoo_
@@ -37,7 +42,7 @@ import networkx as nx
 #                            `=---='
 #
 #         .............................................
-#                  佛祖镇楼                  BUG辟易
+#                  佛祖镇楼                  Bug辟易
 #          佛曰:
 #                  写字楼里写字间，写字间里程序员；
 #                  程序人员写程序，又拿程序换酒钱。
@@ -59,6 +64,62 @@ class SimpleSwitch13(app_manager.RyuApp):
         self.paths = {} #store the shortest path
         self.topology_api_app = self
 
+        self.datapaths = {}
+        self.flow_stats_queue = queue.Queue()
+        self.monitor_thread = hub.spawn(self._monitor)
+        self.flow_stats_processing_thread = hub.spawn(self._flow_stats_processing)
+
+    # 当有交换机添加或离去时及时更新datapaths[]的内容
+    @set_ev_cls(ofp_event.EventOFPStateChange,
+                [MAIN_DISPATCHER, DEAD_DISPATCHER])
+    def _state_change_handler(self,ev):
+        datapath = ev.datapath
+        if ev.state == MAIN_DISPATCHER:
+            if datapath.id not in self.datapaths:
+                self.logger.debug('registering datapath:%s',dpid_lib.dpid_to_str(datapath.id))
+                self.datapaths[datapath.id] = datapath
+            elif ev.state == DEAD_DISPATCHER:
+                if datapath.id in self.datapaths:
+                    self.logger.debug('unregistering datapath:%s',dpid_lib.dpid_to_str(datapath.id))
+                    del self.datapaths[datapath.id]
+    
+    #定期调用请求命令
+    def _monitor(self):
+        while True:
+            for dp in self.datapaths.values():
+                self._request_stats(dp)
+            hub.sleep(10)
+            self.logger.info('monitor is running!!!')
+            self.logger.info('datapaths = %s',self.datapaths)
+
+    #向datapath发送请求
+    def _request_stats(self,datapath):
+        self.logger.debug('send stats requests to:%s',
+                          dpid_lib.dpid_to_str(datapath.id))
+        parser = datapath.ofproto_parser
+        req = parser.OFPFlowStatsRequest(datapath)
+        datapath.send_msg(req)
+
+    #流状态响应函数，将取到的值以字典的形式向放队列
+    @set_ev_cls(ofp_event.EventOFPFlowStatsReply, MAIN_DISPATCHER)
+    def _flow_stats_reply_handler(self,ev):
+        body = ev.msg.body
+        flow_stats = {}
+        flow_stats[dpid_lib.dpid_to_str(ev.msg.datapath.id)] = ev.msg.to_jsondict()
+        self.flow_stats_queue.put(flow_stats)
+    
+    # 每隔10s将队列中所有数据取出，并交给流状态处理函数处理
+    def _flow_stats_processing(self):
+        while True:
+            stats_msg = []
+            hub.sleep(10)
+            while not self.flow_stats_queue.empty():
+                stats_msg.append(self.flow_stats_queue.get())
+            # self.logger.info(json.dumps(stats_msg))
+            stats_processing.hello()
+            stats_processing.process(json.dumps(stats_msg))
+
+    #初始化流表
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
     def switch_features_handler(self, ev):
         datapath = ev.msg.datapath
@@ -133,6 +194,7 @@ class SimpleSwitch13(app_manager.RyuApp):
         if pkt_arp:
             self._packet_in_arp_handler(msg)
 
+    # 获取当前拓扑并将其存入network中
     @set_ev_cls(event.EventSwitchEnter,[CONFIG_DISPATCHER,MAIN_DISPATCHER])    #event is not from openflow protocol, is come from switchs` state changed, just like: link to controller at the first time or send packet to controller
     def get_topology(self,ev):
         '''
@@ -149,6 +211,7 @@ class SimpleSwitch13(app_manager.RyuApp):
         links = [(dpid_lib.dpid_to_str(link.src.dpid),dpid_lib.dpid_to_str(link.dst.dpid),{'attr_dict':{'port':link.src.port_no}}) for link in link_list]    #add edge, need src,dst,weigtht
         self.network.add_edges_from(links)
 
+    # 使用stp获得输出端口    
     def get_out_port(self,datapath,src,dst,in_port):
         '''
         datapath: is current datapath info
@@ -183,6 +246,7 @@ class SimpleSwitch13(app_manager.RyuApp):
             out_port = datapath.ofproto.OFPP_FLOOD    #By flood, to find dst, when dst get packet, dst will send a new back,the graph will record dst info
         return out_port
 
+    # packet_in包中是ip包处理函数    
     def _packet_in_ip_handler(self,msg):
         datapath = msg.datapath
         pkt = packet.Packet(msg.data)
@@ -202,6 +266,7 @@ class SimpleSwitch13(app_manager.RyuApp):
             self.logger.info('get udp packet')
             self._packet_udp_handler(msg)
 
+    # packet_in包中udp包处理函数        
     def _packet_udp_handler(self,msg):
         datapath = msg.datapath
         pkt = packet.Packet(msg.data)
