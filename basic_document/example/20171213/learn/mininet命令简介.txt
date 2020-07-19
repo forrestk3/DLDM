@@ -1,0 +1,106 @@
+sudo mn -h 查看帮助
+
+sudo mn 启动mininet,默认拓扑1交换机连接2主机
+
+sudo mn --test pingall 启动mininet默认拓扑,参数以'--'开始,--test的参数是pingall
+
+sudo mn --controller=remote,ip=127.0.0.1,port=6633 设置控制器参数,这里controller的IP和端口可以设置,默认端口6633
+
+sudo mn --topo=tree,2,3 启动mininet,其拓扑是树状,2层(4 switchs),每层3个节点(9 hosts)
+	(s1, s2) (s1, s3) (s1, s4) (s2, h1) (s2, h2) (s2, h3) (s3, h4) (s3, h5) (s3, h6) (s4, h7) (s4, h8) (s4, h9) 
+
+sudo mn --topo single,3 其拓扑单个交换机和3 hosts
+	(h1, s1) (h2, s1) (h3, s1)
+
+sudo mn --topo linear,4 其拓扑4个switch 4个host,每个sw上有一个host,且4个sw呈线性排列
+(h1, s1) (h2, s2) (h3, s3) (h4, s4) (s2, s1) (s3, s2) (s4, s3) 
+
+sudo mn --custom ~/mininet/custom/topo-test.py --topo mytopo
+	参数--custom载入自己的拓扑文件,参数为后面跟的路径
+	参数--topo后面接拓扑文件中自己定义的拓扑实例
+
+sudo mn -x
+sudo mn --xterm   为每个节点开启一个虚拟机终端
+
+启动参数总结
+-h, --help        show this help message and exit
+--switch=SWITCH        [kernel user ovsk]
+--host=HOST        [process]
+--controller=CONTROLLER        [nox_dump none ref remote nox_pysw]
+--topo=TOPO        [tree reversed single linear minimal],arg1,arg2,...argN
+-c, --clean         clean and exit
+--custom=CUSTOM        read custom topo and node params from .py file
+--test=TEST        [cli build pingall pingpair iperf all iperfudp none]
+-x, --xterms        spawn xterms for each node
+--mac        set MACs equal to DPIDs
+--arp        set all-pairs ARP entries
+-v VERBOSITY, --verbosity=VERBOSITY        [info warning critical error debug output]
+--ip=IP        [ip address as a dotted decimal string for aremote controller]
+--port=PORT        [port integer for a listening remote controller]
+--innamespace        sw and ctrl in namespace?
+--listenport=LISTENPORT        [base port for passive switch listening controller]
+--nolistenport        don't use passive listening port
+--pre=PRE        [CLI script to run before tests]
+--post=POST          [CLI script to run after tests]
+
+
+以上个别--参数可以随意组合,不分顺序
+
+
+----------------------------------------------------
+mininet开启之后,显示'mininet>'提示符
+mininet>help 帮助命令,显示mininet下的命令
+	EOF    gterm  iperfudp  nodes        pingpair      py      switch
+	dpctl  help   link      noecho       pingpairfull  quit    time  
+	dump   intfs  links     pingall      ports         sh      x     
+	exit   iperf  net       pingallfull  px            source  xterm 
+
+mininet>nodes    显示节点
+	available nodes are: 
+	c0 h1 h2 s3 s4 s5 s6
+
+mininet>net			显示网络链接
+mininet>intfs		显示节点网络接口
+mininet>ports   	显示端口
+mininet>pingall 	主机互相ping
+mininet>pingpair	前两个主机互相ping
+mininet>quit/exit	退出	
+mininet>iperf		TCP带宽性能测试
+mininet>iperfudp	UDP带宽性能测试
+mininet>link h1 s1 down	禁用h1<----->s1链路
+mininet>link s1 s2 up	启用s1<----->s2链路
+mininet>sh +外部命令	运行外部shell命令,如 sh echo 'hello'
+mininet>py +python语句	执行python语句,如 py dir(h1)      py h1.IP()
+mininet>h1 +外部命令	在h1节点上执行外部命令
+mininet>h1 ifconfig		查看h1的IP
+mininet>h1 xterm		为h1开启虚拟终端,或者xterm h1 s3 s4 s5开启多个,或者gterm h1
+mininet>h1 ping h2		h1向h2发送ping探测, h1 ping h2 -c 10 其中-c为设置ping次数为10
+mininet>dump			显示节点详细信息//遇到问题使用ovs-ofctl替代
+mininet>dpctl dump-flows	显示流表项
+mininet>s1 dpctl dump-flows tcp:127.0.0.1:6634		显示流表项,s1的端口从6634递增
+mininet>s2 dpctl dump-flows tcp:127.0.0.1:6634		显示流表项,s2的端口从6634递增
+mininet>sh ovs-ofctl dump-flows	显示流表项
+
+ctrl+C 结束执行的命令
+ctrl+D 结束mininet
+
+--------------------------------
+pox web界面开启(http://blog.csdn.net/qq_15437629/article/details/45919417)
+
+./pox/pox.py samples.pretty_log web messenger messenger.log_service messenger.ajax_transport openflow.of_service poxdesk  poxdesk.terminal  poxdesk.tinytopo openflow.discovery forwarding.l2_learning py
+
+---------------------------------------
+环路拓扑问题解决(https://github.com/mininet/mininet/wiki/FAQ#ethernet-loops)
+sudo mn --topo torus,3,3 --switch lxbr,stp=1
+sudo mn --custom ~/mininet/custom/topo-3sw-loop.py --topo mytopo --switch ovsbr,stp=1
+sudo mn --custom ~/mininet/custom/topo-3sw-loop.py --topo mytopo --switch lxbr,stp=1
+sudo mn --custom ~/mininet/custom/topo-3sw-loop.py --topo mytopo --switch ovs,failMode=standalone,stp=1
+
+多路径路由
+https://github.com/brandonheller/riplpox
+
+POX最大支持60个switch,实际测试,mininet 自带控制器 可以支持topo=tree,9,2 即511个节点,丢包严重
+with POX the limit was around 60 switches, and with floodlight it's around 100.
+
+
+

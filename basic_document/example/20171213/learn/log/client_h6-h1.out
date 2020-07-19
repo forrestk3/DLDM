@@ -1,0 +1,11 @@
+------------------------------------------------------------
+Client connecting to 10.0.0.1, UDP port 7007
+Sending 1470 byte datagrams
+UDP buffer size:  208 KByte (default)
+------------------------------------------------------------
+[  3] local 10.0.0.6 port 36443 connected with 10.0.0.1 port 7007
+[ ID] Interval       Transfer     Bandwidth
+[  3]  0.0-10.1 sec   291 KBytes   237 Kbits/sec
+[  3] Sent 203 datagrams
+[  3] Server Report:
+[  3]  0.0-10.1 sec   291 KBytes   237 Kbits/sec   0.024 ms    0/  203 (0%)

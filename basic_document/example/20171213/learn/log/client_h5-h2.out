@@ -1,0 +1,11 @@
+------------------------------------------------------------
+Client connecting to 10.0.0.2, UDP port 7020
+Sending 1470 byte datagrams
+UDP buffer size:  208 KByte (default)
+------------------------------------------------------------
+[  3] local 10.0.0.5 port 50763 connected with 10.0.0.2 port 7020
+[ ID] Interval       Transfer     Bandwidth
+[  3]  0.0-17.2 sec   241 KBytes   115 Kbits/sec
+[  3] Sent 168 datagrams
+[  3] Server Report:
+[  3]  0.0-17.2 sec   241 KBytes   115 Kbits/sec   0.028 ms    0/  168 (0%)

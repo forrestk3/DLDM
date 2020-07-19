@@ -1,0 +1,11 @@
+------------------------------------------------------------
+Client connecting to 10.0.0.1, UDP port 7019
+Sending 1470 byte datagrams
+UDP buffer size:  208 KByte (default)
+------------------------------------------------------------
+[  3] local 10.0.0.8 port 39895 connected with 10.0.0.1 port 7019
+[ ID] Interval       Transfer     Bandwidth
+[  3]  0.0-13.5 sec  79.0 KBytes  48.0 Kbits/sec
+[  3] Sent 55 datagrams
+[  3] Server Report:
+[  3]  0.0-13.5 sec  79.0 KBytes  48.0 Kbits/sec   0.068 ms    0/   55 (0%)

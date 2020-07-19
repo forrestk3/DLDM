@@ -1,0 +1,31 @@
+------------------------------------------------------------
+Server listening on UDP port 7033
+Receiving 1470 byte datagrams
+UDP buffer size:  208 KByte (default)
+------------------------------------------------------------
+[  3] local 10.0.0.2 port 7033 connected with 10.0.0.8 port 35071
+[ ID] Interval       Transfer     Bandwidth        Jitter   Lost/Total Datagrams
+[  3]  0.0- 1.0 sec  14.4 KBytes   118 Kbits/sec   0.007 ms    0/   10 (0%)
+[  3]  1.0- 2.0 sec  14.4 KBytes   118 Kbits/sec   0.011 ms    0/   10 (0%)
+[  3]  2.0- 3.0 sec  14.4 KBytes   118 Kbits/sec   0.018 ms    0/   10 (0%)
+[  3]  3.0- 4.0 sec  14.4 KBytes   118 Kbits/sec   0.018 ms    0/   10 (0%)
+[  3]  4.0- 5.0 sec  14.4 KBytes   118 Kbits/sec   0.035 ms    0/   10 (0%)
+[  3]  5.0- 6.0 sec  14.4 KBytes   118 Kbits/sec   0.026 ms    0/   10 (0%)
+[  3]  6.0- 7.0 sec  14.4 KBytes   118 Kbits/sec   0.035 ms    0/   10 (0%)
+[  3]  7.0- 8.0 sec  14.4 KBytes   118 Kbits/sec   0.036 ms    0/   10 (0%)
+[  3]  8.0- 9.0 sec  15.8 KBytes   129 Kbits/sec   0.038 ms    0/   11 (0%)
+[  3]  9.0-10.0 sec  14.4 KBytes   118 Kbits/sec   0.029 ms    0/   10 (0%)
+[  3] 10.0-11.0 sec  14.4 KBytes   118 Kbits/sec   0.025 ms    0/   10 (0%)
+[  3] 11.0-12.0 sec  14.4 KBytes   118 Kbits/sec   0.022 ms    0/   10 (0%)
+[  3] 12.0-13.0 sec  14.4 KBytes   118 Kbits/sec   0.027 ms    0/   10 (0%)
+[  3] 13.0-14.0 sec  14.4 KBytes   118 Kbits/sec   0.021 ms    0/   10 (0%)
+[  3] 14.0-15.0 sec  14.4 KBytes   118 Kbits/sec   0.029 ms    0/   10 (0%)
+[  3] 15.0-16.0 sec  14.4 KBytes   118 Kbits/sec   0.037 ms    0/   10 (0%)
+[  3] 16.0-17.0 sec  15.8 KBytes   129 Kbits/sec   0.031 ms    0/   11 (0%)
+[  3] 17.0-18.0 sec  14.4 KBytes   118 Kbits/sec   0.034 ms    0/   10 (0%)
+[  3] 18.0-19.0 sec  14.4 KBytes   118 Kbits/sec   0.203 ms    0/   10 (0%)
+[  3] 19.0-20.0 sec  14.4 KBytes   118 Kbits/sec   0.113 ms    0/   10 (0%)
+[  3] 20.0-21.0 sec  14.4 KBytes   118 Kbits/sec   0.073 ms    0/   10 (0%)
+[  3] 21.0-22.0 sec  14.4 KBytes   118 Kbits/sec   0.048 ms    0/   10 (0%)
+[  3] 22.0-23.0 sec  14.4 KBytes   118 Kbits/sec   0.035 ms    0/   10 (0%)
+[  3]  0.0-23.1 sec   336 KBytes   119 Kbits/sec   0.036 ms    0/  234 (0%)

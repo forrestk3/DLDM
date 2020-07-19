@@ -1,0 +1,27 @@
+------------------------------------------------------------
+Server listening on UDP port 7050
+Receiving 1470 byte datagrams
+UDP buffer size:  208 KByte (default)
+------------------------------------------------------------
+[  3] local 10.0.0.7 port 7050 connected with 10.0.0.2 port 51064
+[ ID] Interval       Transfer     Bandwidth        Jitter   Lost/Total Datagrams
+[  3]  0.0- 1.0 sec  11.5 KBytes  94.1 Kbits/sec   0.035 ms    0/    8 (0%)
+[  3]  1.0- 2.0 sec  12.9 KBytes   106 Kbits/sec   0.042 ms    0/    9 (0%)
+[  3]  2.0- 3.0 sec  12.9 KBytes   106 Kbits/sec   0.043 ms    0/    9 (0%)
+[  3]  3.0- 4.0 sec  12.9 KBytes   106 Kbits/sec   0.046 ms    0/    9 (0%)
+[  3]  4.0- 5.0 sec  11.5 KBytes  94.1 Kbits/sec   0.040 ms    0/    8 (0%)
+[  3]  5.0- 6.0 sec  12.9 KBytes   106 Kbits/sec   0.042 ms    0/    9 (0%)
+[  3]  6.0- 7.0 sec  12.9 KBytes   106 Kbits/sec   0.036 ms    0/    9 (0%)
+[  3]  7.0- 8.0 sec  12.9 KBytes   106 Kbits/sec   0.036 ms    0/    9 (0%)
+[  3]  8.0- 9.0 sec  11.5 KBytes  94.1 Kbits/sec   0.191 ms    0/    8 (0%)
+[  3]  9.0-10.0 sec  12.9 KBytes   106 Kbits/sec   0.124 ms    0/    9 (0%)
+[  3] 10.0-11.0 sec  12.9 KBytes   106 Kbits/sec   0.095 ms    0/    9 (0%)
+[  3] 11.0-12.0 sec  12.9 KBytes   106 Kbits/sec   0.061 ms    0/    9 (0%)
+[  3] 12.0-13.0 sec  11.5 KBytes  94.1 Kbits/sec   0.045 ms    0/    8 (0%)
+[  3] 13.0-14.0 sec  12.9 KBytes   106 Kbits/sec   0.040 ms    0/    9 (0%)
+[  3] 14.0-15.0 sec  12.9 KBytes   106 Kbits/sec   0.029 ms    0/    9 (0%)
+[  3] 15.0-16.0 sec  12.9 KBytes   106 Kbits/sec   0.032 ms    0/    9 (0%)
+[  3] 16.0-17.0 sec  11.5 KBytes  94.1 Kbits/sec   0.027 ms    0/    8 (0%)
+[  3] 17.0-18.0 sec  12.9 KBytes   106 Kbits/sec   0.030 ms    0/    9 (0%)
+[  3] 18.0-19.0 sec  12.9 KBytes   106 Kbits/sec   0.030 ms    0/    9 (0%)
+[  3]  0.0-19.2 sec   241 KBytes   103 Kbits/sec   0.032 ms    0/  168 (0%)

@@ -1,0 +1,17 @@
+------------------------------------------------------------
+Server listening on UDP port 7049
+Receiving 1470 byte datagrams
+UDP buffer size:  208 KByte (default)
+------------------------------------------------------------
+[  3] local 10.0.0.6 port 7049 connected with 10.0.0.1 port 48410
+[ ID] Interval       Transfer     Bandwidth        Jitter   Lost/Total Datagrams
+[  3]  0.0- 1.0 sec  4.31 KBytes  35.3 Kbits/sec   0.002 ms    0/    3 (0%)
+[  3]  1.0- 2.0 sec  5.74 KBytes  47.0 Kbits/sec   0.012 ms    0/    4 (0%)
+[  3]  2.0- 3.0 sec  4.31 KBytes  35.3 Kbits/sec   0.015 ms    0/    3 (0%)
+[  3]  3.0- 4.0 sec  5.74 KBytes  47.0 Kbits/sec   0.092 ms    0/    4 (0%)
+[  3]  4.0- 5.0 sec  4.31 KBytes  35.3 Kbits/sec   0.144 ms    0/    3 (0%)
+[  3]  5.0- 6.0 sec  5.74 KBytes  47.0 Kbits/sec   0.122 ms    0/    4 (0%)
+[  3]  6.0- 7.0 sec  5.74 KBytes  47.0 Kbits/sec   0.113 ms    0/    4 (0%)
+[  3]  7.0- 8.0 sec  4.31 KBytes  35.3 Kbits/sec   0.096 ms    0/    3 (0%)
+[  3]  8.0- 9.0 sec  5.74 KBytes  47.0 Kbits/sec   0.197 ms    0/    4 (0%)
+[  3]  0.0- 9.5 sec  48.8 KBytes  42.0 Kbits/sec   0.214 ms    0/   34 (0%)

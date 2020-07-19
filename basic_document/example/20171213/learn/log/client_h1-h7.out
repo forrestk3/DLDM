@@ -1,0 +1,12 @@
+------------------------------------------------------------
+Client connecting to 10.0.0.7, UDP port 7123
+Sending 1470 byte datagrams
+UDP buffer size:  208 KByte (default)
+------------------------------------------------------------
+[  3] local 10.0.0.1 port 44537 connected with 10.0.0.7 port 7123
+[ ID] Interval       Transfer     Bandwidth
+[  3]  0.0-26.6 sec   123 KBytes  38.0 Kbits/sec
+[  3] Sent 86 datagrams
+[  3] Server Report:
+[  3]  0.0-26.5 sec   123 KBytes  38.1 Kbits/sec   0.181 ms    0/   86 (0%)
+
