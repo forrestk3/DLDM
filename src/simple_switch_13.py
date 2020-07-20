@@ -82,7 +82,8 @@ class SimpleSwitch13(app_manager.RyuApp):
                 if datapath.id in self.datapaths:
                     self.logger.debug('unregistering datapath:%s',dpid_lib.dpid_to_str(datapath.id))
                     del self.datapaths[datapath.id]
-    
+
+                    
     #定期调用请求命令
     def _monitor(self):
         while True:
@@ -90,7 +91,7 @@ class SimpleSwitch13(app_manager.RyuApp):
                 self._request_stats(dp)
             hub.sleep(10)
             self.logger.info('monitor is running!!!')
-            self.logger.info('datapaths = %s',self.datapaths)
+            self.logger.info('datapaths list:%s',self.datapaths)
 
     #向datapath发送请求
     def _request_stats(self,datapath):
@@ -103,12 +104,16 @@ class SimpleSwitch13(app_manager.RyuApp):
     #流状态响应函数，将取到的值以字典的形式向放队列
     @set_ev_cls(ofp_event.EventOFPFlowStatsReply, MAIN_DISPATCHER)
     def _flow_stats_reply_handler(self,ev):
+        self.logger.debug('get flow stats reply message')
         body = ev.msg.body
         flow_stats = {}
         flow_stats[dpid_lib.dpid_to_str(ev.msg.datapath.id)] = ev.msg.to_jsondict()
         self.flow_stats_queue.put(flow_stats)
     
     # 每隔10s将队列中所有数据取出，并交给流状态处理函数处理
+    # stats_msg为一个列表，它的每个元素是一个字典
+    # 该字典只有一个元素：键为dpid，值为msg.to_jsondict()
+    # 这么做是为了方便这里的接收。
     def _flow_stats_processing(self):
         while True:
             stats_msg = []
@@ -117,7 +122,7 @@ class SimpleSwitch13(app_manager.RyuApp):
                 stats_msg.append(self.flow_stats_queue.get())
             # self.logger.info(json.dumps(stats_msg))
             stats_processing.hello()
-            stats_processing.process(json.dumps(stats_msg))
+            stats_processing.process(stats_msg)
 
     #初始化流表
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
@@ -138,6 +143,7 @@ class SimpleSwitch13(app_manager.RyuApp):
                                           ofproto.OFPCML_NO_BUFFER)]
         self.add_flow(datapath, 0, match, actions)
 
+        
     def add_flow(self, datapath, priority, match, actions, buffer_id=None, idle_timeout=0):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
@@ -154,9 +160,9 @@ class SimpleSwitch13(app_manager.RyuApp):
                                     idle_timeout=idle_timeout)
         datapath.send_msg(mod)
 
+        
     @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
     def _packet_in_handler(self, ev):
-        self.logger.info('packet_in handler is called!!!')
         # If you hit this you might want to increase
         # the "miss_send_length" of your switch
         if ev.msg.msg_len < ev.msg.total_len:
@@ -178,22 +184,24 @@ class SimpleSwitch13(app_manager.RyuApp):
         if not eth:
             return
 
-       #获得它的IP的源和目的地址,要先看高层协议
+       #针对IP或ARP包分只别进行处理
         pkt_ipv4 = pkt.get_protocol(ipv4.ipv4)
         if pkt_ipv4:
-            ipv4_src = pkt_ipv4.src
-            ipv4_dst = pkt_ipv4.dst
-            self.logger.info('get ipv4:src=%s,dst=%s,eth_src=%s,eth_dst=%s' % (pkt_ipv4.src,
-                pkt_ipv4.dst,
-                pkt.get_protocols(ethernet.ethernet)[0].src,
-                pkt.get_protocols(ethernet.ethernet)[0].dst))
+#            ipv4_src = pkt_ipv4.src
+#            ipv4_dst = pkt_ipv4.dst
+#            self.logger.info('get ipv4:src=%s,dst=%s,eth_src=%s,eth_dst=%s' % (pkt_ipv4.src,
+#                pkt_ipv4.dst,
+#                pkt.get_protocols(ethernet.ethernet)[0].src,
+#                pkt.get_protocols(ethernet.ethernet)[0].dst))
             self._packet_in_ip_handler(msg)
             return
 
         pkt_arp = pkt.get_protocol(arp.arp)
         if pkt_arp:
             self._packet_in_arp_handler(msg)
+            return
 
+        
     # 获取当前拓扑并将其存入network中
     @set_ev_cls(event.EventSwitchEnter,[CONFIG_DISPATCHER,MAIN_DISPATCHER])    #event is not from openflow protocol, is come from switchs` state changed, just like: link to controller at the first time or send packet to controller
     def get_topology(self,ev):
@@ -222,13 +230,11 @@ class SimpleSwitch13(app_manager.RyuApp):
 
         #the first :Doesn`t find src host at graph
         if src not in self.network:
-            self.logger.info("src %s not in network",src)
+            self.logger.info("src %s not in network,add it into graph",src)
             self.network.add_node(src)
             self.network.add_edge(dpid, src, attr_dict={'port':in_port})
             self.network.add_edge(src, dpid)
             self.paths.setdefault(src, {})
-        else:
-            self.logger.info('src %s in network',src)
 
         #second: search the shortest path, from src to dst host
         if dst in self.network:
@@ -240,9 +246,9 @@ class SimpleSwitch13(app_manager.RyuApp):
             next_hop = path[path.index(dpid)+1]
             out_port = self.network[dpid][next_hop]['attr_dict']['port']
             #get path info
-            print("dst in network,path is:",path)
+            print("find path in network:",path)
         else:
-            self.logger.info("dst %s not in network,out_port=flood",dst)
+            self.logger.info("no path for %s -> %s,dst %s not in network,out_port=flood",src,dst,dst)
             out_port = datapath.ofproto.OFPP_FLOOD    #By flood, to find dst, when dst get packet, dst will send a new back,the graph will record dst info
         return out_port
 
@@ -294,13 +300,13 @@ class SimpleSwitch13(app_manager.RyuApp):
                 udp_dst=pkt_udp.dst_port
                 )
             if msg.buffer_id != ofproto.OFP_NO_BUFFER:
-                self.logger.info("in if!%s",out_port)
+#                self.logger.info("in if!%s",out_port)
                 self.add_flow(datapath, 5, match, actions, msg.buffer_id)
                 return
             else:
-                self.logger.info(out_port)
-                self.add_flow(datapath, 5, match, actions)
-                self.logger.info("add flow,dpid:%s,pkt_udp,%s",datapath.id,pkt_udp)
+#                self.logger.info(out_port)
+                self.add_flow(datapath, 5, match, actions, idle_timeout=0)
+                self.logger.info("add flow for udp packet,dpid:%s,match is:",datapath.id)
                 self.logger.info(match)    
         else:
             self.logger.info('udp:out_port is ofproto.OFPP_FLOOD')       
@@ -311,6 +317,7 @@ class SimpleSwitch13(app_manager.RyuApp):
         out = parser.OFPPacketOut(datapath=datapath, buffer_id=msg.buffer_id,
                                   in_port=in_port, actions=actions, data=data)
         datapath.send_msg(out)
+
 
     def _packet_tcp_handler(self,msg):
         datapath = msg.datapath
@@ -392,6 +399,7 @@ class SimpleSwitch13(app_manager.RyuApp):
                                   in_port=in_port, actions=actions, data=data)
         datapath.send_msg(out)
 
+        
     def _packet_in_arp_handler(self,msg):
         datapath = msg.datapath
         pkt_arp = packet.Packet(msg.data).get_protocol(arp.arp)
