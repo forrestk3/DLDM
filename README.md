@@ -20,3 +20,8 @@
 * C-c @ C-s 显示当前代码区
 * C-c @ C-h 折叠当前代码区
 * C-c @ C-c 折叠/显示当前代码区
+
+## 字体大小修改
+放大字体: Ctrl-x Ctrl-+ 或 Ctrl-x Ctrl-=
+缩小字体: Ctrl-x Ctrl–
+重置字体: Ctrl-x Ctrl-0
