@@ -9,6 +9,8 @@ def hello():
 stats = {} #存储过滤后的流表消息
 set_pre_flow_entry = set() # 前一个时刻的流表
 set_flow_entry = set() # 当前流表集
+count_flow_entry = 0 # 当前流表,较上次有变化的流数
+
 
 # 定义几个键常量
 key_OFPFlowStatsReply = 'OFPFlowStatsReply'
@@ -34,22 +36,82 @@ key_duration_sec = 'duration_sec'
 key_packet_count = 'packet_count'
 key_byte_count = 'byte_count'
 
+# 存最近100个元素
+
+list_recent_entry = []
+recent_entry_num = 100
+
+
 # stats_msg为一个列表，它的每个元素是一个字典
 # 该字典只有一个元素：键为dpid，值为msg.to_jsondict()
 # 这么做是为了方便这里的接收。
 def process(stats_msg):
-    print(json.dumps(stats_msg))
+#    print(json.dumps(stats_msg))
     stats = filterIcmpAndArp(stats_msg)
 
-    print('alen:',len(set_flow_entry))
-    print('blen:',len(set_pre_flow_entry))
+    print('current set_flow_entry len:',len(set_flow_entry))
+    print('previous set_flow_entry len:',len(set_pre_flow_entry))
 
     print('current flow_entry')
     for elements in set_flow_entry:
         print(elements.__dict__)
-    print('previous flow_entry')
-    for elements in set_pre_flow_entry:
-        print(elements.__dict__)
+#     print('previous flow_entry')
+#     for elements in set_pre_flow_entry:
+#         print(elements.__dict__)
+
+    print('length of recent flow entry:',len(list_recent_entry))
+
+    pre_entry_list = list(set_pre_flow_entry)
+
+    #对当前流表中的所有流量有变化的流进行特征提取
+    count_flow_entry = 0
+    for entry in set_flow_entry:
+        bytes_inc = entry.byte_count
+        packet_inc = entry.packet_count
+        
+        if entry in pre_entry_list:
+           index = pre_entry_list.index(entry)
+           pre_entry = pre_entry_list[index]
+           # print('current bytes:',entry.byte_count,'pre bytes:',pre_entry.byte_count)
+           # 过滤掉没有包通过的流,因为若该流没有包通过则上个时间段已检测过因此没必要重复检测
+           if entry.byte_count == pre_entry.byte_count:
+               continue
+           bytes_inc = entry.byte_count - pre_entry.byte_count
+           packet_inc = entry.packet_count - pre_entry.packet_count
+           
+        # print('diff entry:',entry.__dict__)
+        count_flow_entry = count_flow_entry + 1
+        print(getEntryFeature(entry),bytes_inc,packet_inc)
+        
+        
+
+# 对于指定流获取它的特征        
+def getEntryFeature(entry):
+    proto = entry.proto
+    src_bytes = entry.byte_count
+    packet_count = entry.packet_count
+    count = 0 # 本时间段内与当前连接目的地址相同的连接数
+    srv_count = 0 #本时间段内与当前连接服务相同的连接数
+    srv_diff_host_rate = 0 # 本时间段内服务相同,不同主机的百分比,它最好与count_flow_entry配合使用
+    srv_diff_host_count = 0
+    
+    for element in set_flow_entry:
+        if element.dIP == entry.dIP:
+            count = count + 1
+
+        if element.dPort == entry.dPort:
+            srv_count = srv_count + 1
+            if element.sIP != entry.sIP or element.dIP != element.dIP:
+                srv_diff_host_count = srv_diff_host_count + 1
+    # 减掉他自己            
+    count = count - 1
+    srv_count = srv_count - 1
+    
+    if srv_diff_host_count != 0:
+        srv_diff_host_rate = srv_diff_host_count / len(set_flow_entry)
+    
+    return proto,src_bytes,count,srv_count,srv_diff_host_rate,packet_count
+
         
 def filterIcmpAndArp(stats_msg):
     # flow_stats为只有一个元素的字典，键为dpid，值为ev.msg.to_jsondict()
@@ -74,26 +136,34 @@ def filterIcmpAndArp(stats_msg):
             udpAndTcpBody = []
             for body in bodys:
                 # 这里又有一个键不要丢了
-                if body[key_OFPFlowStats][key_priority] == 5:
+                if body[key_OFPFlowStats][key_priority] == 5 and  body[key_OFPFlowStats][key_packet_count] != 0:
                     udpAndTcpBody.append(body)
                     # 通过观察它的msg.to_json_dicts获取priority为5的所有匹配项
                     # 并从匹配项中获取流id和统计值
                     matches = body[key_OFPFlowStats][key_match][key_OFPMatch][key_oxm_fields]
 
                     sIP,dIP,sPort,dPort,pro = getFlowId(matches)
-
+                    # 使用获得的流id创建对象，并对该对象赋属性值,并将该流存入set_flow_entry中
                     tempFlow = FlowEntry(sIP,dIP,sPort,dPort,pro)
                     tempFlow.duration_sec = body[key_OFPFlowStats][key_duration_sec]
                     tempFlow.byte_count = body[key_OFPFlowStats][key_byte_count]
                     tempFlow.packet_count = body[key_OFPFlowStats][key_packet_count]
                     set_flow_entry.add(tempFlow)
-#                    set_pre_flow_entry.add(tempFlow)
+
             OFPFlowStatsReply[key_body] = udpAndTcpBody
             flowStatsDict[dpid] = OFPFlowStatsReply
+    # 获得当前流集与前一个time slot流集的差集,并保存最近100个以供计算流特征
+    set_diff_entry = set_flow_entry.difference(set_pre_flow_entry)
+    # 使用global声明，否则会出现“在定义前使用变量”的错误
+    global list_recent_entry
+    list_recent_entry.extend(list(set_diff_entry))
+    list_recent_entry = list_recent_entry[-recent_entry_num:]
+    print('len of list_recent_entry:',len(list_recent_entry))
 
     return flowStatsDict
 
-# 参数为oxm_fields列表，它的每一项都是一个OXMTlv格式的流表匹配项
+# 参数为oxm_fields列表，它的每一项都是一个OXMTlv格式的流表匹配项，
+# 通过解析流表匹配项返回流id五元组
 def getFlowId(oxm_fields):
     sIP = None
     dIP = None
