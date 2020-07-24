@@ -36,10 +36,10 @@ key_duration_sec = 'duration_sec'
 key_packet_count = 'packet_count'
 key_byte_count = 'byte_count'
 
-# 存最近100个元素
+# 存最近100个元素，设为101,因为计算时要减掉自己的那一个
 
 list_recent_entry = []
-recent_entry_num = 100
+recent_entry_num = 101
 
 
 # stats_msg为一个列表，它的每个元素是一个字典
@@ -58,12 +58,13 @@ def process(stats_msg):
 #     print('previous flow_entry')
 #     for elements in set_pre_flow_entry:
 #         print(elements.__dict__)
-
     print('length of recent flow entry:',len(list_recent_entry))
 
-    pre_entry_list = list(set_pre_flow_entry)
+    getEntryStatisticFeature()
 
     #对当前流表中的所有流量有变化的流进行特征提取
+def getEntryStatisticFeature():
+    pre_entry_list = list(set_pre_flow_entry)
     count_flow_entry = 0
     for entry in set_flow_entry:
         bytes_inc = entry.byte_count
@@ -94,6 +95,11 @@ def getEntryFeature(entry):
     srv_count = 0 #本时间段内与当前连接服务相同的连接数
     srv_diff_host_rate = 0 # 本时间段内服务相同,不同主机的百分比,它最好与count_flow_entry配合使用
     srv_diff_host_count = 0
+    dst_host_count = 0 # 前100个连接与当前连接具有相同目标主机连接数
+    global list_recent_entry # 声明该变量是全局的防止出现未定义错误
+    dst_host_srv_count = 0 # 前100个连接与当前连接具有相同目的主机，相同服务数的连接个数
+    dst_host_srv_diff_host_rate = 0 # 前100个连接相同目的主机，相同服务，不同源主机所占百分比
+    dst_host_srv_diff_host_count = 0 
     
     for element in set_flow_entry:
         if element.dIP == entry.dIP:
@@ -107,10 +113,26 @@ def getEntryFeature(entry):
     count = count - 1
     srv_count = srv_count - 1
     
-    if srv_diff_host_count != 0:
+    if srv_diff_host_count > 0:
         srv_diff_host_rate = srv_diff_host_count / len(set_flow_entry)
+
     
-    return proto,src_bytes,count,srv_count,srv_diff_host_rate,packet_count
+    for element in list_recent_entry:
+        if element.dIP == entry.dIP:
+            dst_host_count = dst_host_count + 1
+            if element.dPort == entry.dPort:
+                dst_host_srv_count = dst_host_srv_count + 1
+                if element.sIP != entry.sIP:
+                    dst_host_srv_diff_host_count = dst_host_srv_diff_host_count + 1
+
+    dst_host_count = dst_host_count - 1
+    dst_host_srv_count = dst_host_srv_count - 1
+    #算它使用的不是真实最近流个数而是指定的个数，以防止流数不多时计算结果偏大的情况
+    if dst_host_srv_diff_host_count > 0:  
+        dst_host_srv_diff_host_rate = dst_host_srv_diff_host_count / recent_entry_num 
+                
+    
+    return proto,src_bytes,packet_count,count,srv_count,srv_diff_host_rate,dst_host_count,dst_host_srv_count,dst_host_srv_diff_host_rate
 
         
 def filterIcmpAndArp(stats_msg):
