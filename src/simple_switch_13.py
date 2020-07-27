@@ -68,8 +68,8 @@ class SimpleSwitch13(app_manager.RyuApp):
         self.flow_stats_queue = queue.Queue()
         self.monitor_thread = hub.spawn(self._monitor)
         self.flow_stats_processing_thread = hub.spawn(self._flow_stats_processing)
-        self.tcp_flow_sustain = 19
-        self.udp_flow_sustain = 9
+        self.tcp_flow_sustain = 21
+        self.udp_flow_sustain = 13
 
     # 当有交换机添加或离去时及时更新datapaths[]的内容
     @set_ev_cls(ofp_event.EventOFPStateChange,
@@ -93,7 +93,7 @@ class SimpleSwitch13(app_manager.RyuApp):
                 self._request_stats(dp)
             hub.sleep(10)
             self.logger.info('monitor is running!!!')
-            self.logger.info('datapaths length is:',len(self.datapaths))
+#            self.logger.info('datapaths length is:',len(self.datapaths))
 
     #向datapath发送请求
     def _request_stats(self,datapath):

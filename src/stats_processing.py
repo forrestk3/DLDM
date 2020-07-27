@@ -64,7 +64,7 @@ def process(stats_msg):
 
     # 对当前流表中的所有流量有变化的流进行特征提取
     # 待实现统计量:流时间与流包数比；流字节数与流包数比(只在getEntryFeature中计算),当前流表中dIP,sIP,dPort熵
-# 返回为一个列表:[proto,src_bytes,packet_count,count,srv_count,srv_diff_host_rate,dst_host_count,dst_host_srv_count,dst_host_srv_diff_host_rate,byte_count_inc,packet_count_inc]
+# 返回为一个列表:[proto,src_bytes,packet_count,count,srv_count,srv_diff_host_rate,dst_host_count,dst_host_srv_count,dst_host_srv_diff_host_rate,flow_duration,byte_count_ratio,packet_count_ratio,byte_count_inc,packet_count_inc]
 def getEntryStatisticFeature():
     pre_entry_list = list(set_pre_flow_entry)
     count_flow_entry = 0 # 当前的流数
@@ -88,10 +88,10 @@ def getEntryStatisticFeature():
         list_feature = list(getEntryFeature(entry))
         list_feature.append(byte_count_inc)
         list_feature.append(packet_count_inc)
-        print(list_feature)
+        print(list_feature) #这里有个问题,for只会运行一次,需要修改
         
 # 对于指定流获取它的特征
-# 返回为一个元组:(proto,src_bytes,packet_count,count,srv_count,srv_diff_host_rate,dst_host_count,dst_host_srv_count,dst_host_srv_diff_host_rate)
+# 返回为一个元组:(proto,src_bytes,packet_count,count,srv_count,srv_diff_host_rate,dst_host_count,dst_host_srv_count,dst_host_srv_diff_host_rate,flow_duration,byte_count_ratio,packet_count_ratio)
 def getEntryFeature(entry):
     proto = entry.proto
     src_bytes = entry.byte_count
@@ -104,7 +104,10 @@ def getEntryFeature(entry):
     global list_recent_entry # 声明该变量是全局的防止出现未定义错误
     dst_host_srv_count = 0 # 前100个连接与当前连接具有相同目的主机，相同服务数的连接个数
     dst_host_srv_diff_host_rate = 0 # 前100个连接相同目的主机，相同服务，不同源主机所占百分比
-    dst_host_srv_diff_host_count = 0 
+    dst_host_srv_diff_host_count = 0
+    flow_duration = 0
+    byte_count_ratio = 0
+    packet_count_ratio = 0
     
     for element in set_flow_entry:
         if element.dIP == entry.dIP:
@@ -133,9 +136,14 @@ def getEntryFeature(entry):
     dst_host_srv_count = dst_host_srv_count - 1
     #算它使用的不是真实最近流个数而是指定的个数，以防止流数不多时计算结果偏大的情况
     if dst_host_srv_diff_host_count > 0:  
-        dst_host_srv_diff_host_rate = dst_host_srv_diff_host_count / recent_entry_num 
+        dst_host_srv_diff_host_rate = dst_host_srv_diff_host_count / recent_entry_num
+
+    flow_duration = entry.duration_sec
+    if flow_duration > 0:
+        byte_count_ratio = src_bytes / flow_duration
+        packet_count_ratio = packet_count / flow_duration
              
-    return proto,src_bytes,packet_count,count,srv_count,srv_diff_host_rate,dst_host_count,dst_host_srv_count,dst_host_srv_diff_host_rate
+    return proto,src_bytes,packet_count,count,srv_count,srv_diff_host_rate,dst_host_count,dst_host_srv_count,dst_host_srv_diff_host_rate,flow_duration,byte_count_ratio,packet_count_ratio
 
         
 def filterIcmpAndArp(stats_msg):
@@ -166,7 +174,7 @@ def filterIcmpAndArp(stats_msg):
                     # 通过观察它的msg.to_json_dicts获取priority为5的所有匹配项
                     # 并从匹配项中获取流id和统计值
                     matches = body[key_OFPFlowStats][key_match][key_OFPMatch][key_oxm_fields]
-
+                    # 获取流表id，并根据该id创建流对象
                     sIP,dIP,sPort,dPort,pro = getFlowId(matches)
                     # 使用获得的流id创建对象，并对该对象赋属性值,并将该流存入set_flow_entry中
                     tempFlow = FlowEntry(sIP,dIP,sPort,dPort,pro)
@@ -218,7 +226,7 @@ def getFlowId(oxm_fields):
             continue
     return sIP,dIP,sPort,dPort,proto
 
-
+# 流对象类，修改hash从而达到对流去重的效果
 class FlowEntry:
     sIP = None
     dIP = None
