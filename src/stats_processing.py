@@ -58,17 +58,20 @@ def process(stats_msg):
 #     print('previous flow_entry')
 #     for elements in set_pre_flow_entry:
 #         print(elements.__dict__)
-    print('length of recent flow entry:',len(list_recent_entry))
+
 
     getEntryStatisticFeature()
 
-    #对当前流表中的所有流量有变化的流进行特征提取
+    # 对当前流表中的所有流量有变化的流进行特征提取
+    # 待实现统计量:流时间与流包数比；流字节数与流包数比(只在getEntryFeature中计算),当前流表中dIP,sIP,dPort熵
+# 返回为一个列表:[proto,src_bytes,packet_count,count,srv_count,srv_diff_host_rate,dst_host_count,dst_host_srv_count,dst_host_srv_diff_host_rate,byte_count_inc,packet_count_inc]
 def getEntryStatisticFeature():
     pre_entry_list = list(set_pre_flow_entry)
-    count_flow_entry = 0
+    count_flow_entry = 0 # 当前的流数
+    list_feature = []
     for entry in set_flow_entry:
-        bytes_inc = entry.byte_count
-        packet_inc = entry.packet_count
+        byte_count_inc = entry.byte_count # 较上个time slot该流发送字节增长数
+        packet_count_inc = entry.packet_count # 较上个time slot该流发送包数增长数
         
         if entry in pre_entry_list:
            index = pre_entry_list.index(entry)
@@ -82,11 +85,13 @@ def getEntryStatisticFeature():
            
         # print('diff entry:',entry.__dict__)
         count_flow_entry = count_flow_entry + 1
-        print(getEntryFeature(entry),bytes_inc,packet_inc)
+        list_feature = list(getEntryFeature(entry))
+        list_feature.append(byte_count_inc)
+        list_feature.append(packet_count_inc)
+        print(list_feature)
         
-        
-
-# 对于指定流获取它的特征        
+# 对于指定流获取它的特征
+# 返回为一个元组:(proto,src_bytes,packet_count,count,srv_count,srv_diff_host_rate,dst_host_count,dst_host_srv_count,dst_host_srv_diff_host_rate)
 def getEntryFeature(entry):
     proto = entry.proto
     src_bytes = entry.byte_count
@@ -115,7 +120,6 @@ def getEntryFeature(entry):
     
     if srv_diff_host_count > 0:
         srv_diff_host_rate = srv_diff_host_count / len(set_flow_entry)
-
     
     for element in list_recent_entry:
         if element.dIP == entry.dIP:
@@ -130,8 +134,7 @@ def getEntryFeature(entry):
     #算它使用的不是真实最近流个数而是指定的个数，以防止流数不多时计算结果偏大的情况
     if dst_host_srv_diff_host_count > 0:  
         dst_host_srv_diff_host_rate = dst_host_srv_diff_host_count / recent_entry_num 
-                
-    
+             
     return proto,src_bytes,packet_count,count,srv_count,srv_diff_host_rate,dst_host_count,dst_host_srv_count,dst_host_srv_diff_host_rate
 
         
