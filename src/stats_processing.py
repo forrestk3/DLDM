@@ -1,5 +1,6 @@
 import queue
 import json
+import sys
 
 # 类,函数使用驼峰命名；变量使用蛇形命名
 
@@ -37,10 +38,14 @@ key_packet_count = 'packet_count'
 key_byte_count = 'byte_count'
 
 # 存最近100个元素，设为101,因为计算时要减掉自己的那一个
-
 list_recent_entry = []
 recent_entry_num = 101
 
+# 存流特征记录到文件的参数
+record_total_count = 10000
+record_current_count = 0
+record_file_path='/home/hb/sdn/record.csv'
+record_file = open(record_file_path,'w')
 
 # stats_msg为一个列表，它的每个元素是一个字典
 # 该字典只有一个元素：键为dpid，值为msg.to_jsondict()
@@ -55,12 +60,13 @@ def process(stats_msg):
     print('current flow_entry')
     for elements in set_flow_entry:
         print(elements.__dict__)
-#     print('previous flow_entry')
-#     for elements in set_pre_flow_entry:
-#         print(elements.__dict__)
 
-
+    global record_total_count,record_current_count,record_file
     getEntryStatisticFeature()
+    if recpord_current_count > record_total_count:
+        record_file.close()
+        sys.exit()
+    
 
     # 对当前流表中的所有流量有变化的流进行特征提取
     # 待实现统计量:流时间与流包数比；流字节数与流包数比(只在getEntryFeature中计算),当前流表中dIP,sIP,dPort熵
@@ -80,14 +86,23 @@ def getEntryStatisticFeature():
            # 过滤掉没有包通过的流,因为若该流没有包通过则上个时间段已检测过因此没必要重复检测
            if entry.byte_count == pre_entry.byte_count:
                continue
-           bytes_inc = entry.byte_count - pre_entry.byte_count
-           packet_inc = entry.packet_count - pre_entry.packet_count
+           bytes_count_inc = entry.byte_count - pre_entry.byte_count
+           packet_count_inc = entry.packet_count - pre_entry.packet_count
            
         # print('diff entry:',entry.__dict__)
         count_flow_entry = count_flow_entry + 1
         list_feature = list(getEntryFeature(entry))
         list_feature.append(byte_count_inc)
         list_feature.append(packet_count_inc)
+
+        global record_current_count
+        record_current_count = record_current_count + 1
+        list_feature = [str(feature) for feature in list_feature]
+        split_str = ','
+        record_file.write(split_str.join(list_feature))
+        record_file.write('\n')
+        print('current record count is :',record_current_count)
+        
         print(list_feature) #这里有个问题,for只会运行一次,需要修改
         
 # 对于指定流获取它的特征
