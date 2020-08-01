@@ -29,23 +29,22 @@
 ## 在emacs中安装magit
 取自:https://magit.vc/manual/magit/Installing-from-Melpa.html#Installing-from-Melpa
 add one of the archives to package-archives:
-
-    To use Melpa: 
-
+To use Melpa: 
+```
 (require 'package)
 (add-to-list 'package-archives
              '("melpa" . "http://melpa.org/packages/") t)
-
-    To use Melpa-Stable: 
-
+```
+To use Melpa-Stable: 
+```
 (require 'package)
 (add-to-list 'package-archives
              '("melpa-stable" . "http://stable.melpa.org/packages/") t)
-
+```
 Once you have added your preferred archive, you need to update the local package list using:
 
-M-x package-refresh-contents RET
+> M-x package-refresh-contents RET
 
 Once you have done that, you can install Magit and its dependencies using:
 
-M-x package-install RET magit RET
+> M-x package-install RET magit RET
