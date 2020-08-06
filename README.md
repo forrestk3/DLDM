@@ -48,3 +48,14 @@ Once you have added your preferred archive, you need to update the local package
 Once you have done that, you can install Magit and its dependencies using:
 
 > M-x package-install RET magit RET
+
+## Emacs 中使用拼写检查
+> M-x flyspell-mode  
+若出现Error: No word lists can be found for the language "zh_CN"
+则在.emacs中加入如下代码,指定其只用于检查英语即可
+```
+;; use apsell as ispell backend
+(setq-default ispell-program-name "aspell")
+;; use American English as ispell default dictionary
+(ispell-change-dictionary "american" t)
+```
