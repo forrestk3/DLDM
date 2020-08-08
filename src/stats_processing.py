@@ -63,7 +63,7 @@ def process(stats_msg):
 
     global record_total_count,record_current_count,record_file
     getEntryStatisticFeature()
-    if recpord_current_count > record_total_count:
+    if record_current_count > record_total_count:
         record_file.close()
         sys.exit()
     

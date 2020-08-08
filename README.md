@@ -59,3 +59,15 @@ Once you have done that, you can install Magit and its dependencies using:
 ;; use American English as ispell default dictionary
 (ispell-change-dictionary "american" t)
 ```
+
+## Emacs 中进行查找与替换
+* 使用 M-% 开启查找替换模式
+|使令|作用
+|---|--
+|y,[space] | 替换当前并到下一个
+|n|忽略当前到下一个
+|^|回到前一个匹配入
+|q|退出
+
+* M-x recursive-edit:递归编辑,再用C-M-c返回,没试成功.
+
