@@ -7,6 +7,16 @@
 * https://ryu.readthedocs.io/en/latest/ofproto_v1_3_ref.html //doc
 * https://www.cnblogs.com/ssyfj/p/11762093.html //山上有风景博客，写得不错
 
+# ubutu
+## ubuntu关闭自动锁屏
+
+   关闭息屏，最后0是代表关闭锁屏，将0替换为60代表60s后自动息屏，以此类推。
+    gsettings set org.gnome.desktop.session idle-delay 0
+     
+     
+    关闭锁屏
+    gsettings set org.gnome.desktop.screensaver lock-enabled false
+
 # emacs常用命令
 ## 代码折叠
 这里说的是emacs自带的HideShow mode.
